@@ -3,6 +3,7 @@ package me.rhunk.snapenhance.core.features.impl.tweaks
 import android.view.ViewGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import me.rhunk.snapenhance.common.data.ContentType
 import me.rhunk.snapenhance.core.SnapEnhance
 import me.rhunk.snapenhance.core.event.events.impl.BindViewEvent
 import me.rhunk.snapenhance.core.features.Feature
@@ -139,6 +140,8 @@ class VoiceNoteOverride: Feature("Voice Note Override") {
 
                     val composerContext = composerRootView.getComposerContext() ?: return@subscribe
                     val playbackViewComponentContext = composerContext.componentContext?.get() ?: return@subscribe
+
+                    if (event.databaseMessage?.contentType != ContentType.NOTE.id) return@subscribe
 
                     val serverMessageId = event.databaseMessage?.serverMessageId?.toLong() ?: return@subscribe
 
