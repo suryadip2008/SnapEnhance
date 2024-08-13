@@ -255,7 +255,8 @@ class EditRule : Routes.Route() {
                         currentScopeType = TrackerScopeType.WHITELIST
                         addFriendDialog = AddFriendDialog(
                             context,
-                            friendDialogActions
+                            friendDialogActions,
+                            pinnedIds = scopes,
                         )
                     }) {
                         Row(
@@ -274,7 +275,8 @@ class EditRule : Routes.Route() {
                         currentScopeType = TrackerScopeType.BLACKLIST
                         addFriendDialog = AddFriendDialog(
                             context,
-                            friendDialogActions
+                            friendDialogActions,
+                            pinnedIds = scopes,
                         )
                     }) {
                         Row(
