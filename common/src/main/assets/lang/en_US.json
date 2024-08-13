@@ -314,7 +314,7 @@
         },
         "security_features": {
             "name": "Security Features",
-            "description": "Access security features"
+            "description": "Change security features preferences"
         },
         "file_imports": {
             "name": "File Imports",
