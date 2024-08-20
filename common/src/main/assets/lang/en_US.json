@@ -771,6 +771,10 @@
                             "spoof_headphones": {
                                 "name": "Spoof Headphones",
                                 "description": "Spoofs the status of listening to music on map"
+                            },
+                            "show_battery_level": {
+                                "name": "Show Battery Level",
+                                "description": "Shows the battery level of your friends on the map"
                             }
                         }
                     },
