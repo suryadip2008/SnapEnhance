@@ -41,7 +41,7 @@ object Updater {
             JsonParser.parseString(it.body.string()).asJsonObject
         }
         val debugRuns = actionRuns.getAsJsonArray("workflow_runs")?.mapNotNull { it.asJsonObject }?.filter { run ->
-            run.getAsJsonPrimitive("conclusion")?.asString == "success" && run.getAsJsonPrimitive("path")?.asString == ".github/workflows/debug.yml"
+            run.get("conclusion")?.takeIf { it.isJsonPrimitive }?.asString == "success" && run.getAsJsonPrimitive("path")?.asString == ".github/workflows/debug.yml"
         } ?: throw Throwable("No debug CI runs found")
 
         val latestRun = debugRuns.firstOrNull() ?: throw Throwable("No debug CI runs found")
