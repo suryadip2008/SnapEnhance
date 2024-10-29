@@ -25,7 +25,6 @@ import me.rhunk.snapenhance.common.util.protobuf.ProtoReader
 import me.rhunk.snapenhance.core.event.events.impl.AddViewEvent
 import me.rhunk.snapenhance.core.event.events.impl.UnaryCallEvent
 import me.rhunk.snapenhance.core.features.Feature
-import me.rhunk.snapenhance.core.ui.children
 import me.rhunk.snapenhance.core.util.RandomWalking
 import me.rhunk.snapenhance.core.util.dataBuilder
 import me.rhunk.snapenhance.core.util.hook.HookStage
@@ -210,7 +209,7 @@ class BetterLocation : Feature("Better Location") {
             hook("getLongitude", HookStage.BEFORE, { canSpoofLocation() }) { it.setResult(getLong()) }
         }
 
-        val mapViewId = context.resources.getId("mapview")
+        val mapFeaturesRootId = context.resources.getId("map_features_root")
 
         if (context.config.global.betterLocation.showBatteryLevel.get()) {
             findClass("snap.snap_maps_sdk.nano.SnapMapsSdk\$PublicUserInfo").hook("setDisplayName", HookStage.BEFORE) { param ->
@@ -233,13 +232,11 @@ class BetterLocation : Feature("Better Location") {
         }
 
         context.event.subscribe(AddViewEvent::class) { event ->
-            if (!event.viewClassName.endsWith("MapScreenRoot")) return@subscribe
+            if (event.view.id != mapFeaturesRootId) return@subscribe
+            val view = event.view as RelativeLayout
 
-            event.view.addOnAttachStateChangeListener(object: View.OnAttachStateChangeListener {
+            view.addOnAttachStateChangeListener(object: View.OnAttachStateChangeListener {
                 override fun onViewAttachedToWindow(v: View) {
-                    val mapView = event.view.findViewById<View>(mapViewId) ?: throw IllegalStateException("Map view not found")
-                    val view = (mapView.parent as ViewGroup).children().firstOrNull { it is RelativeLayout } as? RelativeLayout ?: throw IllegalStateException("Map view parent not found")
-
                     view.addView(createComposeView(view.context) {
                         val darkTheme = remember { context.androidContext.isDarkTheme() }
                         Box(

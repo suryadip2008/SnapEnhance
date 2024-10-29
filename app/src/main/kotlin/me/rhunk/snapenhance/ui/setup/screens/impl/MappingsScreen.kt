@@ -22,14 +22,12 @@ class MappingsScreen : SetupScreen() {
         var isGenerating by remember { mutableStateOf(false) }
 
         if (infoText != null) {
-            fun dismiss() {
+            Dialog(onDismissRequest = {
                 infoText = null
-                goNext()
-            }
-
-            Dialog(onDismissRequest = { dismiss() }) {
+            }) {
                 remember { AlertDialogs(context.translation) }.InfoDialog(title = infoText!!) {
-                    dismiss()
+                    infoText = null
+                    goNext()
                 }
             }
         }
@@ -42,16 +40,7 @@ class MappingsScreen : SetupScreen() {
                     if (context.installationSummary.snapchatInfo == null) {
                         throw Exception(context.translation["setup.mappings.generate_failure_no_snapchat"])
                     }
-                    val warnings = context.mappings.refresh()
-
-                    if (warnings.isNotEmpty()) {
-                        isGenerating = false
-                        infoText = "${warnings.size} warning(s) occurred while generating mappings:\n\n${warnings.joinToString("\n")}".also {
-                            context.log.warn(it)
-                        }
-                        return@launch
-                    }
-
+                    context.mappings.refresh()
                     withContext(Dispatchers.Main) {
                         goNext()
                     }

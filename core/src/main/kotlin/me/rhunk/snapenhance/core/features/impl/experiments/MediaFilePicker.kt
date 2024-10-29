@@ -35,6 +35,7 @@ import me.rhunk.snapenhance.core.ui.ViewAppearanceHelper
 import me.rhunk.snapenhance.core.util.dataBuilder
 import me.rhunk.snapenhance.core.util.hook.HookStage
 import me.rhunk.snapenhance.core.util.hook.hook
+import me.rhunk.snapenhance.core.util.ktx.getId
 import java.io.InputStream
 import java.lang.reflect.Method
 import kotlin.random.Random
@@ -191,7 +192,7 @@ class MediaFilePicker : Feature("Media File Picker") {
             val buttonTag = Random.nextInt(0, 65535)
 
             context.event.subscribe(AddViewEvent::class) { event ->
-                if (event.parent !is FrameLayout || !event.view::class.java.name.endsWith("ChatMediaDrawer")) return@subscribe
+                if (event.parent.id != context.resources.getId("chat_drawer_container") || !event.view::class.java.name.endsWith("ChatMediaDrawer")) return@subscribe
 
                 event.view.addOnAttachStateChangeListener(object: View.OnAttachStateChangeListener {
                     override fun onViewAttachedToWindow(v: View) {

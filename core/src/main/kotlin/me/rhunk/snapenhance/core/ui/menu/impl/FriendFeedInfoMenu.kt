@@ -5,12 +5,9 @@ import android.content.res.Resources
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -36,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.res.use
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,16 +48,15 @@ import me.rhunk.snapenhance.common.ui.createComposeAlertDialog
 import me.rhunk.snapenhance.common.ui.createComposeView
 import me.rhunk.snapenhance.common.util.protobuf.ProtoReader
 import me.rhunk.snapenhance.common.util.snap.BitmojiSelfie
-import me.rhunk.snapenhance.core.event.events.impl.AddViewEvent
 import me.rhunk.snapenhance.core.features.impl.experiments.EndToEndEncryption
 import me.rhunk.snapenhance.core.features.impl.messaging.AutoMarkAsRead
 import me.rhunk.snapenhance.core.features.impl.messaging.Messaging
 import me.rhunk.snapenhance.core.features.impl.spying.MessageLogger
 import me.rhunk.snapenhance.core.ui.ViewAppearanceHelper
-import me.rhunk.snapenhance.core.ui.children
+import me.rhunk.snapenhance.core.ui.applyTheme
 import me.rhunk.snapenhance.core.ui.menu.AbstractMenu
-import me.rhunk.snapenhance.core.ui.randomTag
 import me.rhunk.snapenhance.core.ui.triggerRootCloseTouchEvent
+import me.rhunk.snapenhance.core.util.ktx.getIdentifier
 import me.rhunk.snapenhance.core.util.ktx.isDarkTheme
 import java.net.HttpURLConnection
 import java.net.URL
@@ -70,6 +67,22 @@ import java.util.Date
 import java.util.Locale
 
 class FriendFeedInfoMenu : AbstractMenu() {
+    private val avenirNextMediumFont by lazy {
+        FontFamily(
+            Font(context.resources.getIdentifier("avenir_next_medium", "font"), FontWeight.Medium)
+        )
+    }
+    private val sigColorTextPrimary by lazy {
+        context.androidContext.theme.obtainStyledAttributes(
+            intArrayOf(context.resources.getIdentifier("sigColorTextPrimary", "attr"))
+        ).use { it.getColor(0, 0) }
+    }
+    private val sigColorBackgroundSurface by lazy {
+        context.androidContext.theme.obtainStyledAttributes(
+            intArrayOf(context.resources.getIdentifier("sigColorBackgroundSurface", "attr"))
+        ).use { it.getColor(0, 0) }
+    }
+
     private fun getImageDrawable(url: String): Drawable {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connect()
@@ -159,7 +172,7 @@ class FriendFeedInfoMenu : AbstractMenu() {
             createComposeAlertDialog(
                 context.mainActivity!!,
             ) {
-                var pageIndex by remember { mutableIntStateOf(0) }
+                var pageIndex by remember { mutableStateOf(0) }
                 val messages = remember { mutableStateListOf<@Composable () -> Unit>() }
                 var totalMessages by remember { mutableIntStateOf(-1) }
                 val coroutineScope = rememberCoroutineScope()
@@ -321,16 +334,12 @@ class FriendFeedInfoMenu : AbstractMenu() {
         if (index > 0) {
             Spacer(modifier = Modifier
                 .height(1.dp)
-                .background(remember {
-                    if (context.androidContext.isDarkTheme()) Color(0x1affffff) else Color(
-                        0xffeeeeee
-                    )
-                })
+                .background(remember { if (context.androidContext.isDarkTheme()) Color(0x1affffff) else Color(0xffeeeeee) })
                 .fillMaxWidth())
         }
         Surface(
-            color = Color(context.userInterface.actionSheetBackground),
-            contentColor = Color(context.userInterface.colorPrimary),
+            color = Color(sigColorBackgroundSurface),
+            contentColor = Color(sigColorTextPrimary),
         ) {
             Row(
                 modifier = Modifier
@@ -363,66 +372,9 @@ class FriendFeedInfoMenu : AbstractMenu() {
         }
     }
 
-    private val recyclerViewTag = randomTag()
-    private val messaging by lazy { context.feature(Messaging::class)}
+    override fun inject(parent: ViewGroup, view: View, viewConsumer: ((View) -> Unit)) {
+        val modContext = context
 
-    override fun onViewAdded(event: AddViewEvent) {
-        fun hasAvatarHeader(viewGroup: ViewGroup): Boolean {
-            val constraintLayout = viewGroup.getChildAt(0)?.takeIf { it.javaClass.name.endsWith("ConstraintLayout") } as? ViewGroup ?: return false
-            return constraintLayout.children().firstOrNull { it.javaClass.name.endsWith("AvatarView") } != null
-        }
-
-        if (event.parent is FrameLayout && messaging.lastFocusedConversationType == 1 && event.view.javaClass.name.endsWith("RecyclerView")) {
-            event.view.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-                if (event.view.tag == recyclerViewTag || !hasAvatarHeader(event.view as ViewGroup)) return@addOnLayoutChangeListener
-                event.view.tag = recyclerViewTag
-
-                // remove recycler view
-                event.parent.removeView(event.view)
-
-                val newLayout = LinearLayout(event.view.context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.BOTTOM
-                    layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                    addView(event.view)
-                }
-
-                newLayout.addView(ScrollView(newLayout.context).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        weight = 1f;
-                        setMargins(0, 100, 0, 0)
-                    }
-
-                    addView(LinearLayout(context).apply {
-                        orientation = LinearLayout.VERTICAL
-                        injectIntoActionSheetItems(newLayout) {
-                            it.layoutParams = LinearLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT
-                            ).apply {
-                                setMargins(0, 5, 0, 5)
-                            }
-                            addView(it)
-                        }
-                    })
-                }, 0)
-
-                event.parent.addView(newLayout)
-            }
-        }
-
-        if (event.parent is LinearLayout && event.viewClassName.endsWith("SnapCardView") && hasAvatarHeader(event.parent)) {
-            val actionSheetItemsContainerLayout = (event.view as ViewGroup).getChildAt(0) as? ViewGroup ?: throw IllegalStateException("ActionSheetItemsContainerLayout not found")
-            injectIntoActionSheetItems(actionSheetItemsContainerLayout) {
-                actionSheetItemsContainerLayout.addView(it, 0)
-            }
-        }
-    }
-
-    private fun injectIntoActionSheetItems(actionSheetItemsContainer: View, viewConsumer: ((View) -> Unit)) {
         val friendFeedMenuOptions by context.config.userInterface.friendFeedMenuButtons
         if (friendFeedMenuOptions.isEmpty()) return
 
@@ -458,7 +410,7 @@ class FriendFeedInfoMenu : AbstractMenu() {
                     )
                 }
 
-                context.features.getRuleFeatures().forEach { ruleFeature ->
+                modContext.features.getRuleFeatures().forEach { ruleFeature ->
                     if (!friendFeedMenuOptions.contains(ruleFeature.ruleType.key)) return@forEach
 
                     val ruleState = ruleFeature.getRuleState() ?: return@forEach
@@ -526,7 +478,7 @@ class FriendFeedInfoMenu : AbstractMenu() {
                             }
                         },
                         onLongClick = {
-                            actionSheetItemsContainer.post {
+                            view.post {
                                 context.apply {
                                     closeMenu()
                                     inAppOverlay.showStatusToast(
@@ -544,11 +496,9 @@ class FriendFeedInfoMenu : AbstractMenu() {
         }
 
         viewConsumer(
-            createComposeView(actionSheetItemsContainer.context) {
+            createComposeView(view.context) {
                 CompositionLocalProvider(
-                    LocalTextStyle provides LocalTextStyle.current.merge(TextStyle(fontFamily = FontFamily(
-                        Font(context.userInterface.getFontResource(600) ?: throw IllegalStateException("Avenir Next font not found"), FontWeight.Medium)
-                    )))
+                    LocalTextStyle provides LocalTextStyle.current.merge(TextStyle(fontFamily = avenirNextMediumFont))
                 ) {
                     ComposeFriendFeedMenu()
                 }
@@ -567,14 +517,16 @@ class FriendFeedInfoMenu : AbstractMenu() {
                         it.hasInterface(EnumScriptInterface.FRIEND_FEED_CONTEXT_MENU)
                     } ?: return@eachModule
 
-                viewConsumer(LinearLayout(actionSheetItemsContainer.context).apply {
+                viewConsumer(LinearLayout(view.context).apply {
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
                     )
 
+                    applyTheme(view.width, hasRadius = true)
+
                     orientation = LinearLayout.VERTICAL
-                    addView(createComposeView(actionSheetItemsContainer.context) {
+                    addView(createComposeView(view.context) {
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colorScheme.surface

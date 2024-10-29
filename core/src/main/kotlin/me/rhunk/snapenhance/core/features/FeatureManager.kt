@@ -60,7 +60,6 @@ class FeatureManager(
 
     fun init() {
         register(
-            Debug(),
             SecurityFeatures(),
             EndToEndEncryption(),
             ScopeSync(),
@@ -103,7 +102,7 @@ class FeatureManager(
             HideStreakRestore(),
             HideFriendFeedEntry(),
             HideQuickAddFriendFeed(),
-            CallButtonsOverride(),
+            CallStartConfirmation(),
             SnapPreview(),
             BypassScreenshotDetection(),
             HalfSwipeNotifier(),
@@ -143,6 +142,8 @@ class FeatureManager(
             runCatching {
                 measureTimeMillis {
                     feature.init()
+                }.also {
+                    context.log.verbose("Feature ${feature.key} initialized in $it ms")
                 }
             }.onFailure {
                 context.log.error("Failed to init feature ${feature.key}", it)
@@ -162,6 +163,8 @@ class FeatureManager(
                 }.onFailure {
                     context.log.error("Failed to run activity listener ${activityListener::class.simpleName}", it)
                 }
+            }.also {
+                context.log.verbose("Activity listener ${activityListener::class.simpleName} executed in $it ms")
             }
         }
     }

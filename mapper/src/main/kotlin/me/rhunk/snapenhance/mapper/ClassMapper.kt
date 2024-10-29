@@ -17,7 +17,6 @@ class ClassMapper(
     private vararg val mappers: AbstractClassMapper = DEFAULT_MAPPERS,
 ) {
     private val classes = mutableListOf<ClassDef>()
-    private val warnings = mutableListOf<String>()
 
     companion object {
         val DEFAULT_MAPPERS get() = arrayOf(
@@ -74,8 +73,6 @@ class ClassMapper(
         }
     }
 
-    fun getWarns() = warnings
-
     suspend fun run(): JsonObject {
         val context = MapperContext(classes.associateBy { it.type })
 
@@ -90,7 +87,7 @@ class ClassMapper(
         val outputJson = JsonObject()
         mappers.forEach { mapper ->
             outputJson.add(mapper.mapperName, JsonObject().apply {
-                warnings.addAll(mapper.writeFromJson(this))
+                mapper.writeFromJson(this)
             })
         }
         return outputJson

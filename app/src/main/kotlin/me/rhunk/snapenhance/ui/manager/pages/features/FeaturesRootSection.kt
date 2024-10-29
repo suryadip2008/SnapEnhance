@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -384,17 +383,9 @@ class FeaturesRootSection : Routes.Route() {
             FeatureNotice.REQUIRE_NATIVE_HOOKS.key to Color(0xFFFF5722),
         )
 
-        val versionCheck = remember { property.key.params.versionCheck }
-        val versionCheckPair = remember(property) { versionCheck?.checkVersion(context.installationSummary.snapchatInfo?.versionCode ?: return@remember null)}
-        val isComponentDisabled = remember { versionCheckPair != null && versionCheck?.isDisabled == true }
-
         ElevatedCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(
-                    if (isComponentDisabled) Modifier.graphicsLayer(alpha = 0.5f)
-                    else Modifier
-                )
                 .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 5.dp)
         ) {
             Row(
@@ -442,21 +433,7 @@ class FeaturesRootSection : Routes.Route() {
                             lineHeight = 15.sp
                         )
                     }
-
-                    if (versionCheckPair != null) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = context.translation.format(
-                                "manager.sections.features.${versionCheckPair.second.key}",
-                                "version" to versionCheckPair.first.first
-                            ),
-                            color = Color(0xFFFF8585),
-                            fontSize = 12.sp,
-                            lineHeight = 15.sp
-                        )
-                    }
                 }
-
                 Row(
                     modifier = Modifier
                         .align(Alignment.CenterVertically)
@@ -685,7 +662,7 @@ class FeaturesRootSection : Routes.Route() {
                     contentPadding = PaddingValues(top = 10.dp, bottom = 110.dp),
                     verticalArrangement = Arrangement.Top
                 ) {
-                    items(properties, key = { it.key.propertyName() }) {
+                    items(properties) {
                         PropertyCard(it)
                     }
                 }

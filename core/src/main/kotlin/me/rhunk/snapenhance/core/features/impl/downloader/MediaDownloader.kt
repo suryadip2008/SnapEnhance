@@ -11,7 +11,10 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Warning
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import me.rhunk.snapenhance.bridge.DownloadCallback
@@ -35,6 +38,7 @@ import me.rhunk.snapenhance.core.features.impl.messaging.Messaging
 import me.rhunk.snapenhance.core.features.impl.spying.MessageLogger
 import me.rhunk.snapenhance.core.ui.ViewAppearanceHelper
 import me.rhunk.snapenhance.core.ui.debugEditText
+import me.rhunk.snapenhance.core.util.hook.HookAdapter
 import me.rhunk.snapenhance.core.util.hook.HookStage
 import me.rhunk.snapenhance.core.util.hook.hook
 import me.rhunk.snapenhance.core.util.ktx.getObjectField
@@ -108,9 +112,8 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
                     if (!downloadLogging.contains("success")) return
                     context.log.verbose("onSuccess: outputFile=$outputFile")
                     context.inAppOverlay.showStatusToast(
-                        icon = Icons.Outlined.DownloadDone,
-                        durationMs = 1300,
-                        text = translations["content_saved_toast"].also {
+                        icon = Icons.Outlined.CheckCircle,
+                        text = translations.format("saved_toast", "path" to outputFile.split("/").takeLast(2).joinToString("/")).also {
                             if (context.isMainActivityPaused) {
                                 context.shortToast(it)
                             }
@@ -123,7 +126,6 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
                     context.log.verbose("onProgress: message=$message")
                     context.inAppOverlay.showStatusToast(
                         icon = Icons.Outlined.Info,
-                        durationMs = 1300,
                         text = message,
                     )
                     if (context.isMainActivityPaused) {
@@ -147,7 +149,6 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
 
                     context.inAppOverlay.showStatusToast(
                         icon = Icons.Outlined.Warning,
-                        durationMs = 1300,
                         text = message,
                     )
                 }
@@ -258,7 +259,7 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
         forceAllowDuplicate: Boolean = false
     ) {
         //messages
-        paramMap["MESSAGE_ID"]?.toString()?.takeIf { forceDownload || shouldAutoDownload("friend_snaps") }?.let { id ->
+        paramMap["MESSAGE_ID"]?.toString()?.takeIf { forceDownload || canAutoDownload("friend_snaps") }?.let { id ->
             val messageId = id.substring(id.lastIndexOf(":") + 1).toLong()
             val conversationMessage = context.database.getConversationMessageFromId(messageId)!!
 
@@ -293,7 +294,7 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
 
         //private stories
         paramMap["PLAYLIST_V2_GROUP"]?.takeIf {
-            forceDownload || shouldAutoDownload("friend_stories")
+            forceDownload || canAutoDownload("friend_stories")
         }?.let { playlistGroup ->
             val playlistGroupString = playlistGroup.toString()
 
@@ -341,7 +342,7 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
 
         //public stories
         if ((snapSource == "PUBLIC_USER" || snapSource == "SAVED_STORY") &&
-            (forceDownload || shouldAutoDownload("public_stories"))) {
+            (forceDownload || canAutoDownload("public_stories"))) {
 
             val author = (
                 paramMap["USER_ID"]?.let { context.database.getFriendInfo(it.toString())?.mutableUsername } // only for following users
@@ -368,7 +369,7 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
         }
 
         //spotlight
-        if (snapSource == "SINGLE_SNAP_STORY" && (forceDownload || shouldAutoDownload("spotlight"))) {
+        if (snapSource == "SINGLE_SNAP_STORY" && (forceDownload || canAutoDownload("spotlight"))) {
             downloadOperaMedia(provideDownloadManagerClient(
                 mediaIdentifier = paramMap["SNAP_ID"].toString(),
                 downloadSource = MediaDownloadSource.SPOTLIGHT,
@@ -483,7 +484,7 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
         }
     }
 
-    private fun shouldAutoDownload(keyFilter: String? = null): Boolean {
+    private fun canAutoDownload(keyFilter: String? = null): Boolean {
         val options by context.config.downloader.autoDownloadSources
         return options.any { keyFilter == null || it.contains(keyFilter, true) }
     }
@@ -491,56 +492,48 @@ class MediaDownloader : MessagingRuleFeature("MediaDownloader", MessagingRuleTyp
     override fun init() {
         onNextActivityCreate {
             context.mappings.useMapper(OperaPageViewControllerMapper::class) {
+                val onOperaViewStateCallback: (HookAdapter) -> Unit = onOperaViewStateCallback@{ param ->
+                    val viewState = (param.thisObject() as Any).getObjectField(viewStateField.get()!!).toString()
+                    if (viewState != "FULLY_DISPLAYED") {
+                        return@onOperaViewStateCallback
+                    }
+                    val operaLayerList = (param.thisObject() as Any).getObjectField(layerListField.get()!!) as ArrayList<*>
+                    val mediaParamMap: ParamMap = operaLayerList.map { Layer(it) }.first().paramMap
+
+                    if (!mediaParamMap.containsKey("image_media_info") && !mediaParamMap.containsKey("video_media_info_list"))
+                        return@onOperaViewStateCallback
+
+                    val mediaInfoMap = mutableMapOf<SplitMediaAssetType, MediaInfo>()
+                    val isVideo = mediaParamMap.containsKey("video_media_info_list")
+
+                    mediaInfoMap[SplitMediaAssetType.ORIGINAL] = MediaInfo(
+                        (if (isVideo) mediaParamMap["video_media_info_list"] else mediaParamMap["image_media_info"])!!
+                    )
+
+                    if (context.config.downloader.mergeOverlays.get() && mediaParamMap.containsKey("overlay_image_media_info")) {
+                        mediaInfoMap[SplitMediaAssetType.OVERLAY] =
+                            MediaInfo(mediaParamMap["overlay_image_media_info"]!!)
+                    }
+                    lastSeenMapParams = mediaParamMap
+                    lastSeenMediaInfoMap = mediaInfoMap
+
+                    if (!canAutoDownload()) return@onOperaViewStateCallback
+
+                    context.executeAsync {
+                        runCatching {
+                            handleOperaMedia(mediaParamMap, mediaInfoMap, false)
+                        }.onFailure {
+                            context.log.error("Failed to handle opera media", it)
+                            context.longToast(it.message)
+                        }
+                    }
+                }
+
                 arrayOf(onDisplayStateChange, onDisplayStateChangeGesture).forEach { methodName ->
                     classReference.get()?.hook(
                         methodName.get() ?: return@forEach,
-                        HookStage.AFTER
-                    ) onOperaViewStateCallback@{ param ->
-                        val viewState = (param.thisObject() as Any).getObjectField(viewStateField.get()!!).toString()
-
-                        if (viewState != "FULLY_DISPLAYED") {
-                            return@onOperaViewStateCallback
-                        }
-
-                        val operaLayerList = (param.thisObject() as Any).getObjectField(layerListField.get()!!) as ArrayList<*>
-                        val mediaParamMap: ParamMap = operaLayerList.map { Layer(it) }.first().paramMap
-
-                        if (!mediaParamMap.containsKey("image_media_info") && !mediaParamMap.containsKey("video_media_info_list")) {
-                            return@onOperaViewStateCallback
-                        }
-
-                        val mediaInfoMap = mutableMapOf<SplitMediaAssetType, MediaInfo>()
-                        val isVideo = mediaParamMap.containsKey("video_media_info_list")
-
-                        mediaInfoMap[SplitMediaAssetType.ORIGINAL] = MediaInfo(
-                            (if (isVideo) mediaParamMap["video_media_info_list"] else mediaParamMap["image_media_info"])!!
-                        )
-
-                        if (context.config.downloader.mergeOverlays.get() && mediaParamMap.containsKey("overlay_image_media_info")) {
-                            mediaInfoMap[SplitMediaAssetType.OVERLAY] =
-                                MediaInfo(mediaParamMap["overlay_image_media_info"]!!)
-                        }
-
-                        val shouldAutoDownload = shouldAutoDownload()
-
-                        if (shouldAutoDownload && lastSeenMediaInfoMap?.get(SplitMediaAssetType.ORIGINAL)?.uri == mediaInfoMap[SplitMediaAssetType.ORIGINAL]?.uri) return@onOperaViewStateCallback
-
-                        lastSeenMapParams = mediaParamMap
-                        lastSeenMediaInfoMap = mediaInfoMap
-
-                        if (!shouldAutoDownload) {
-                            return@onOperaViewStateCallback
-                        }
-
-                        context.executeAsync {
-                            runCatching {
-                                handleOperaMedia(mediaParamMap, mediaInfoMap, false)
-                            }.onFailure {
-                                context.log.error("Failed to handle opera media", it)
-                                context.longToast(it.message)
-                            }
-                        }
-                    }
+                        HookStage.AFTER, onOperaViewStateCallback
+                    )
                 }
             }
         }

@@ -1,5 +1,6 @@
 package me.rhunk.snapenhance.core.ui.menu.impl
 
+import android.graphics.Color
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -8,46 +9,32 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.RemoveRedEye
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material3.Icon
-import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import me.rhunk.snapenhance.common.ui.createComposeView
-import me.rhunk.snapenhance.core.event.events.impl.AddViewEvent
 import me.rhunk.snapenhance.core.features.impl.downloader.MediaDownloader
 import me.rhunk.snapenhance.core.features.impl.messaging.AutoMarkAsRead
 import me.rhunk.snapenhance.core.ui.children
 import me.rhunk.snapenhance.core.ui.iterateParent
 import me.rhunk.snapenhance.core.ui.menu.AbstractMenu
 import me.rhunk.snapenhance.core.ui.triggerCloseTouchEvent
+import me.rhunk.snapenhance.core.util.ktx.getDimens
+import me.rhunk.snapenhance.core.util.ktx.getDrawable
 import me.rhunk.snapenhance.core.util.ktx.vibrateLongPress
 
 class OperaViewerIcons : AbstractMenu() {
-    private val actionMenuIconSize by lazy { context.userInterface.dpToPx(32) }
-    private val actionMenuIconMargin by lazy { context.userInterface.dpToPx(5) }
-    private val actionMenuIconMarginTop by lazy { context.userInterface.dpToPx(10) }
+    private val downloadSvgDrawable by lazy { context.resources.getDrawable("svg_download", context.androidContext.theme) }
+    private val eyeSvgDrawable by lazy { context.resources.getDrawable("svg_eye_24x24", context.androidContext.theme) }
+    private val actionMenuIconSize by lazy { context.resources.getDimens("action_menu_icon_size") }
+    private val actionMenuIconMargin by lazy { context.resources.getDimens("action_menu_icon_margin") }
+    private val actionMenuIconMarginTop by lazy { context.resources.getDimens("action_menu_icon_margin_top") }
 
-    override fun onViewAdded(event: AddViewEvent) {
-        if (event.view is FrameLayout && event.parent.javaClass.superclass?.name?.endsWith("OpenLayout") == true) {
-            val viewGroup = event.view as? ViewGroup ?: return
-            if (
-                viewGroup.childCount == 0 ||
-                viewGroup.children().any { it !is ImageView } ||
-                event.parent.children().none { it.javaClass.name.endsWith("ScalableCircleMaskFrameLayout") }
-            ) return
-            inject(viewGroup)
-        }
-    }
-
-    private fun inject(parent: ViewGroup) {
+    override fun inject(parent: ViewGroup, view: View, viewConsumer: (View) -> Unit) {
         val mediaDownloader = context.feature(MediaDownloader::class)
 
         if (context.config.downloader.operaDownloadButton.get()) {
-            parent.addView(LinearLayout(parent.context).apply {
+            parent.addView(LinearLayout(view.context).apply {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -71,13 +58,15 @@ class OperaViewerIcons : AbstractMenu() {
                     override fun onViewDetachedFromWindow(v: View) {}
                 })
 
-                addView(createComposeView(parent.context) {
-                    Icon(
-                        imageVector = Icons.Outlined.Download,
-                        tint = Color.White,
-                        contentDescription = null
-                    )
-                }.apply {
+                addView(ImageView(view.context).apply {
+                    setImageDrawable(downloadSvgDrawable)
+                    setColorFilter(Color.WHITE)
+                    layoutParams = LinearLayout.LayoutParams(
+                        actionMenuIconSize,
+                        actionMenuIconSize
+                    ).apply {
+                        setMargins(0, 0, 0, actionMenuIconMargin * 2)
+                    }
                     setOnClickListener {
                         mediaDownloader.downloadLastOperaMediaAsync(allowDuplicate = false)
                     }
@@ -86,14 +75,9 @@ class OperaViewerIcons : AbstractMenu() {
                         mediaDownloader.downloadLastOperaMediaAsync(allowDuplicate = true)
                         true
                     }
-                    layoutParams = LinearLayout.LayoutParams(
-                        actionMenuIconSize,
-                        actionMenuIconSize
-                    ).apply {
-                        setMargins(0, 0, 0, actionMenuIconMargin * 2)
-                    }
                 })
             }, 0)
+
         }
 
         if (context.config.messaging.markSnapAsSeenButton.get()) {
@@ -105,13 +89,28 @@ class OperaViewerIcons : AbstractMenu() {
                     ?.let { return it[0] to it[2] }
             }
 
-            parent.addView(createComposeView(parent.context)  {
-                Icon(
-                    imageVector = Icons.Default.RemoveRedEye,
-                    tint = Color.White,
-                    contentDescription = null
-                )
-            }.apply {
+            parent.addView(ImageView(view.context).apply {
+                setImageDrawable(eyeSvgDrawable)
+                setColorFilter(Color.WHITE)
+                addOnAttachStateChangeListener(object: View.OnAttachStateChangeListener {
+                    override fun onViewAttachedToWindow(v: View) {
+                        v.visibility = View.GONE
+                        this@OperaViewerIcons.context.coroutineScope.launch(Dispatchers.Main) {
+                            delay(300)
+                            v.visibility = if (getMessageId() != null) View.VISIBLE else View.GONE
+                        }
+                    }
+                    override fun onViewDetachedFromWindow(v: View) {}
+                })
+                layoutParams = FrameLayout.LayoutParams(
+                    (actionMenuIconSize * 1.4).toInt(),
+                    (actionMenuIconSize * 1.4).toInt()
+                ).apply {
+                    setMargins(0, 0, 0, actionMenuIconMarginTop * 2 + (80 * context.resources.displayMetrics.density).toInt())
+                    marginEnd = actionMenuIconMarginTop * 2
+                    marginStart = actionMenuIconMarginTop * 2
+                    gravity = Gravity.BOTTOM or Gravity.END
+                }
                 setOnClickListener {
                     this@OperaViewerIcons.context.apply {
                         coroutineScope.launch {
@@ -145,28 +144,7 @@ class OperaViewerIcons : AbstractMenu() {
                         }
                     }
                 }
-
-                addOnAttachStateChangeListener(object: View.OnAttachStateChangeListener {
-                    override fun onViewAttachedToWindow(v: View) {
-                        v.visibility = View.GONE
-                        this@OperaViewerIcons.context.coroutineScope.launch(Dispatchers.Main) {
-                            delay(250)
-                            v.visibility = if (getMessageId() != null) View.VISIBLE else View.GONE
-                        }
-                    }
-                    override fun onViewDetachedFromWindow(v: View) {}
-                })
-
-                layoutParams = FrameLayout.LayoutParams(
-                    (actionMenuIconSize * 1.5).toInt(),
-                    (actionMenuIconSize * 1.5).toInt()
-                ).apply {
-                    setMargins(0, 0, 0, actionMenuIconMarginTop * 2 + this@OperaViewerIcons.context.userInterface.dpToPx(80))
-                    marginEnd = actionMenuIconMarginTop * 2
-                    marginStart = actionMenuIconMarginTop * 2
-                    gravity = Gravity.BOTTOM or Gravity.END
-                }
-            })
+            }, 0)
         }
     }
 }

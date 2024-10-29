@@ -9,6 +9,4 @@ class AddViewEvent(
     var view: View,
     var index: Int,
     var layoutParams: ViewGroup.LayoutParams
-) : AbstractHookEvent() {
-    val viewClassName by lazy { view.javaClass.name }
-}
+) : AbstractHookEvent()

@@ -94,9 +94,7 @@
                 "config_import_success_toast": "Config imported successfully",
                 "config_import_failure_toast": "Failed to import config {error}",
                 "config_export_failure_toast": "Failed to export config {error}",
-                "saved_config_snackbar": "Config saved",
-                "older_required": "This feature requires Snapchat v{version} or older to work correctly",
-                "newer_required": "This feature requires Snapchat v{version} or newer to work correctly"
+                "saved_config_snackbar": "Config saved"
             },
             "manage_rule_feature": {
                 "disable_state_option": "Disabled",
@@ -523,6 +521,10 @@
                     "disable_spotlight": {
                         "name": "Disable Spotlight",
                         "description": "Disables the Spotlight page"
+                    },
+                    "hide_settings_gear": {
+                        "name": "Hide Settings Gear",
+                        "description": "Hides the SnapEnhance Settings Gear in friend feed"
                     },
                     "friend_feed_menu_buttons": {
                         "name": "Friend Feed Menu Buttons",
@@ -1573,7 +1575,7 @@
         "no_attachments_toast": "No attachments found!",
         "already_queued_toast": "Media already in queue!",
         "already_downloaded_toast": "Media already downloaded!",
-        "content_saved_toast": "Saved!",
+        "saved_toast": "Saved to {path}",
         "download_toast": "Downloading {path}...",
         "processing_toast": "Processing {path}...",
         "failed_generic_toast": "Failed to download",

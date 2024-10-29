@@ -162,7 +162,6 @@ class SnapEnhance {
             mappings.init(androidContext)
             database.init()
             eventDispatcher.init()
-            userInterface.init()
             //if mappings aren't loaded, we can't initialize features
             if (!mappings.isMappingsLoaded) return
             features.init()
